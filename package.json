@@ -2,6 +2,9 @@
   "name": "nextn",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed-database.ts seed",
     "db:clear": "tsx scripts/seed-database.ts clear",
-    "db:reset": "tsx scripts/seed-database.ts reset"
+    "db:reset": "tsx scripts/seed-database.ts reset",
+    "vercel-build": "next build"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.32.0",

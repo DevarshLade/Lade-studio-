@@ -10,6 +10,9 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
   // Check if we have the required environment variables
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
   
+  // Get the app URL for domain-specific configuration
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  
   // If we don't have the publishable key, render children without Clerk
   if (!publishableKey) {
     console.warn('Missing Clerk publishable key - Clerk will not be available')
@@ -46,6 +49,9 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
           },
         },
       }}
+      // Add domain-specific configuration
+      domain={appUrl.replace('https://', '').replace('http://', '')}
+      isSatellite={!!process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')}
     >
       {children}
     </ClerkReactProvider>

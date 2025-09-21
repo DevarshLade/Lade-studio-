@@ -1,0 +1,32 @@
+# Dependencies that are only used in development
+node_modules/
+
+# Build outputs
+.next/
+out/
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+
+# Logs
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Other
+*.md
+README*

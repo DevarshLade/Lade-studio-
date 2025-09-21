@@ -1,82 +1,83 @@
-import { Webhook } from 'svix';
-import { headers } from 'next/headers';
-import { WebhookEvent } from '@clerk/nextjs/server';
-import { syncUserToSupabase, handleUserDeleted } from '@/lib/services/webhookService';
+import { Webhook } from 'svix'
+import { headers } from 'next/headers'
+import { WebhookEvent } from '@clerk/nextjs/server'
+import { syncUserToSupabase, handleUserDeleted } from '@/lib/services/webhookService'
+import { handleCorsPreflight, withCorsHeaders } from '@/lib/cors'
 
-// This webhook endpoint handles Clerk user events
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return withCorsHeaders(new Response(null, { status: 204 }))
+}
+
 export async function POST(req: Request) {
-  // Get the webhook secret from environment variables
-  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
-  
+  // Handle CORS preflight
+  const corsPreflight = handleCorsPreflight(req as any)
+  if (corsPreflight) return corsPreflight
+
+  // You can find this in the Clerk Dashboard -> Webhooks -> choose the webhook
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET
+
   if (!WEBHOOK_SECRET) {
-    throw new Error('CLERK_WEBHOOK_SECRET is not set');
+    throw new Error('Please add CLERK_WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local')
   }
 
   // Get the headers
-  const headerPayload = await headers();
-  const svix_id = headerPayload.get("svix-id");
-  const svix_timestamp = headerPayload.get("svix-timestamp");
-  const svix_signature = headerPayload.get("svix-signature");
+  const headerPayload = await headers()
+  const svix_id = headerPayload.get('svix-id')
+  const svix_timestamp = headerPayload.get('svix-timestamp')
+  const svix_signature = headerPayload.get('svix-signature')
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
     return new Response('Error occured -- no svix headers', {
       status: 400
-    });
+    })
   }
 
   // Get the body
-  const payload = await req.json();
-  const body = JSON.stringify(payload);
+  const payload = await req.json()
+  const body = JSON.stringify(payload)
 
-  // Create a new Svix instance with your secret
-  const wh = new Webhook(WEBHOOK_SECRET);
+  // Create a new Svix instance with your secret.
+  const wh = new Webhook(WEBHOOK_SECRET)
 
-  let evt: WebhookEvent;
+  let evt: WebhookEvent
 
   // Verify the payload with the headers
   try {
     evt = wh.verify(body, {
-      "svix-id": svix_id,
-      "svix-timestamp": svix_timestamp,
-      "svix-signature": svix_signature,
-    }) as WebhookEvent;
+      'svix-id': svix_id,
+      'svix-timestamp': svix_timestamp,
+      'svix-signature': svix_signature,
+    }) as WebhookEvent
   } catch (err) {
-    console.error('Error verifying webhook:', err);
+    console.error('Error verifying webhook:', err)
     return new Response('Error occured', {
       status: 400
-    });
+    })
   }
 
-  // Handle the webhook
-  const eventType = evt.type;
-  
-  if (eventType === 'user.created' || eventType === 'user.updated') {
-    const result = await syncUserToSupabase(evt.data);
-    
-    if (!result.success) {
-      return new Response('Error syncing user to Supabase', {
-        status: 500
-      });
-    }
-    
-    console.log('User synced to Supabase');
-  }
-  
-  if (eventType === 'user.deleted') {
-    const userId = evt.data.id;
-    if (userId) {
-      const result = await handleUserDeleted(userId);
-      
-      if (!result.success) {
-        return new Response('Error deleting user from Supabase', {
-          status: 500
-        });
+  // Get the ID and type
+  const { id } = evt.data
+  const eventType = evt.type
+
+  // Handle different event types
+  switch (eventType) {
+    case 'user.created':
+      await syncUserToSupabase(evt.data)
+      break
+    case 'user.updated':
+      await syncUserToSupabase(evt.data)
+      break
+    case 'user.deleted':
+      if (id) {
+        await handleUserDeleted(id)
       }
-    }
-    
-    console.log('User deleted from Supabase');
+      break
+    default:
+      console.log(`Unhandled event type: ${eventType}`)
   }
 
-  return new Response('', { status: 200 });
+  // Return a response with CORS headers
+  return withCorsHeaders(new Response('Webhook received', { status: 200 }))
 }

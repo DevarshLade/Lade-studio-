@@ -12,6 +12,9 @@ if (!hasSupabaseConfig) {
   console.warn('Missing Supabase environment variables - Supabase client will not be available')
 }
 
+// Get the app URL for CORS configuration
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
 // Client for browser/client-side operations
 export const supabase = hasSupabaseConfig 
   ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
