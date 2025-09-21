@@ -12,7 +12,7 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
   const clerkDomain = process.env.NEXT_PUBLIC_CLERK_DOMAIN
   
   // Get the app URL for domain-specific configuration
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ladestudio.shop'
   
   // If we don't have the publishable key, render children without Clerk
   if (!publishableKey) {
@@ -23,7 +23,7 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
   return (
     <ClerkReactProvider
       publishableKey={publishableKey}
-      domain={clerkDomain || appUrl.replace('https://', '').replace('http://', '')}
+      domain={clerkDomain || 'clerk.ladestudio.shop'}
       appearance={{
         baseTheme: theme === 'dark' ? dark : undefined,
         variables: {
