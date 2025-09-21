@@ -112,7 +112,7 @@ function ProductReviews({ product }: { product: Product }) {
         setReviewCount(countData);
       }
 
-      // Check eligibility (now based on 10 review limit)
+      // Check eligibility (now based on purchase verification)
       const { canReview: eligible, reason } = await canUserReviewProduct(user.id, product.id);
       setCanReview(eligible);
       setReviewEligibilityReason(reason || '');
@@ -151,6 +151,10 @@ function ProductReviews({ product }: { product: Product }) {
       review.id === updatedReview.id ? updatedReview : review
     ));
     setCurrentEditReview(null);
+    toast({
+      title: "Review Updated",
+      description: "Your review has been successfully updated.",
+    });
   };
   
   const handleReviewSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -165,8 +169,8 @@ function ProductReviews({ product }: { product: Product }) {
     
     if (newRating === 0) {
       toast({
-        title: "Please select a rating",
-        description: "You must provide a rating from 1 to 5 stars.",
+        title: "Rating Required",
+        description: "Please select a rating from 1 to 5 stars.",
         variant: "destructive"
       });
       setSubmitting(false);
@@ -175,7 +179,7 @@ function ProductReviews({ product }: { product: Product }) {
     
     if (!user) {
       toast({
-        title: "Authentication Error",
+        title: "Authentication Required",
         description: "You must be signed in to submit a review.",
         variant: "destructive"
       });
@@ -187,7 +191,7 @@ function ProductReviews({ product }: { product: Product }) {
     
     if (error) {
       toast({
-        title: "Error submitting review",
+        title: "Error Submitting Review",
         description: error.message,
         variant: "destructive"
       });
@@ -364,7 +368,7 @@ function ProductReviews({ product }: { product: Product }) {
                     </div>
                   </div>
                   {/* Add Another Review Form */}
-                  {canReview && (
+                  {canReview ? (
                     <div>
                       <h3 className="text-lg font-medium mb-4">Add Another Review ({reviewCount.remaining} remaining)</h3>
                       <form className="space-y-4" onSubmit={handleReviewSubmit}>
@@ -389,6 +393,19 @@ function ProductReviews({ product }: { product: Product }) {
                           {submitting ? 'Submitting...' : 'Submit Review'}
                         </Button>
                       </form>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="bg-muted/50 p-6 rounded-lg">
+                        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground font-medium mb-2">Unable to Write Review</p>
+                        <p className="text-sm text-muted-foreground">{reviewEligibilityReason}</p>
+                        {!isAuthenticated && (
+                          <Button asChild className="mt-4">
+                            <Link href="/auth">Sign In to Review</Link>
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

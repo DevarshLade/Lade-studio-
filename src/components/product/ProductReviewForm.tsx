@@ -4,6 +4,9 @@
 import { useState, memo, useCallback } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { createReview } from '@/lib/services/userService';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 interface ProductReviewFormProps {
   productId: string;
@@ -16,30 +19,35 @@ const ProductReviewForm = memo(({
   productName,
   onReviewSubmitted 
 }: ProductReviewFormProps) => {
-  const { user, isAuthenticated } = useUser();
+  const { toast } = useToast();
+  const { user, isAuthenticated, loading } = useUser();
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!isAuthenticated || !user?.id) {
-      setError('Please sign in to write a review');
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to write a review.",
+        variant: "destructive"
+      });
       return;
     }
 
     if (comment.trim() === '') {
-      setError('Please write a review comment');
+      toast({
+        title: "Review Required",
+        description: "Please write a review comment.",
+        variant: "destructive"
+      });
       return;
     }
 
     try {
       setSubmitting(true);
-      setError(null);
-      setSuccess(false);
       
       const result = await createReview(
         user.id,
@@ -49,30 +57,60 @@ const ProductReviewForm = memo(({
       );
       
       if (result.success) {
-        setSuccess(true);
+        toast({
+          title: "Review Submitted!",
+          description: "Thank you for your feedback.",
+        });
         setRating(5);
         setComment('');
         if (onReviewSubmitted) {
           onReviewSubmitted();
         }
       } else {
-        setError('Failed to submit review');
+        toast({
+          title: "Error",
+          description: result.error?.message || "Failed to submit review",
+          variant: "destructive"
+        });
         console.error('Error submitting review:', result.error);
       }
     } catch (err) {
-      setError('An error occurred while submitting the review');
+      toast({
+        title: "Error",
+        description: "An error occurred while submitting the review",
+        variant: "destructive"
+      });
       console.error('Error:', err);
     } finally {
       setSubmitting(false);
     }
-  }, [isAuthenticated, user?.id, productId, rating, comment, onReviewSubmitted]);
+  }, [isAuthenticated, user?.id, productId, rating, comment, onReviewSubmitted, toast]);
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="border rounded-lg p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-200 rounded"></div>
+          <div className="h-20 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication prompt
   if (!isAuthenticated) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-yellow-800">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+        <h3 className="text-xl font-bold mb-2">Write a Review</h3>
+        <p className="text-yellow-800 mb-4">
           Please sign in to write a review for {productName}.
         </p>
+        <Button asChild>
+          <Link href="/auth">Sign In to Review</Link>
+        </Button>
       </div>
     );
   }
@@ -80,18 +118,6 @@ const ProductReviewForm = memo(({
   return (
     <div className="border rounded-lg p-6">
       <h3 className="text-xl font-bold mb-4">Write a Review</h3>
-      
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <p className="text-green-800">Thank you for your review!</p>
-        </div>
-      )}
-      
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-800">Error: {error}</p>
-        </div>
-      )}
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -127,17 +153,13 @@ const ProductReviewForm = memo(({
           />
         </div>
         
-        <button
+        <Button
           type="submit"
           disabled={submitting}
-          className={`px-6 py-3 rounded-lg font-medium ${
-            submitting
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
-          }`}
+          className="w-full"
         >
           {submitting ? 'Submitting...' : 'Submit Review'}
-        </button>
+        </Button>
       </form>
     </div>
   );

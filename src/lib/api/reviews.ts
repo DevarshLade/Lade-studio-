@@ -31,10 +31,44 @@ export async function canUserReviewProduct(userId: string, productId: string): P
       }
     }
     
-    // For now, allow all users to review products
-    // In a real implementation, you might check if the user has purchased the product
+    // Import getUserOrders function
+    const { getUserOrders } = await import('@/lib/api/orders');
+    
+    // Get user's orders
+    const { data: orders, error: ordersError } = await getUserOrders(userId);
+    
+    if (ordersError) {
+      return { 
+        canReview: false, 
+        reason: 'Error checking order history', 
+        error: ordersError 
+      }
+    }
+    
+    // Check if user has purchased this product
+    const hasPurchasedProduct = orders?.some(order => 
+      order.order_items?.some(item => item.product_id === productId)
+    ) || false;
+    
+    if (!hasPurchasedProduct) {
+      return { 
+        canReview: false, 
+        reason: 'You must purchase this product before writing a review', 
+        error: null 
+      }
+    }
+    
+    // Check if order is delivered (for now, we'll allow reviews for all completed orders)
+    const hasDeliveredOrder = orders?.some(order => 
+      order.order_items?.some(item => item.product_id === productId) && 
+      order.status?.toLowerCase() === 'delivered'
+    ) || false;
+    
+    // For now, we'll allow reviews for purchased products regardless of delivery status
+    // In a real implementation, you might want to check for delivery status
     return { 
-      canReview: true, 
+      canReview: hasPurchasedProduct, 
+      reason: hasPurchasedProduct ? undefined : 'You must purchase this product before writing a review',
       error: null 
     }
   } catch (error) {
@@ -70,6 +104,15 @@ export async function canUserEditReview(userId: string, reviewId: string): Promi
       return { 
         canEdit: false, 
         reason: 'Review ID is required', 
+        error: null 
+      }
+    }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { 
+        canEdit: false, 
+        reason: 'Database not configured', 
         error: null 
       }
     }
@@ -126,6 +169,11 @@ export async function updateProductReview(
     // Validate user ID
     if (!userId) {
       throw new Error('User ID is required')
+    }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      throw new Error('Database not configured')
     }
     
     // First check if user can edit this review
@@ -214,6 +262,11 @@ export async function getUserReviewsForProduct(userId: string, productId: string
     if (!productId) {
       return { data: null, error: new Error('Product ID is required') }
     }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { data: null, error: new Error('Database not configured') }
+    }
 
     const { data: reviews, error } = await (supabase as any)
       .from('reviews')
@@ -250,6 +303,11 @@ export async function getUserReviewForProduct(userId: string, productId: string)
     if (!productId) {
       return { data: null, error: new Error('Product ID is required') }
     }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { data: null, error: new Error('Database not configured') }
+    }
 
     const { data: review, error } = await (supabase as any)
       .from('reviews')
@@ -277,6 +335,11 @@ export async function getUserReviewForProduct(userId: string, productId: string)
  */
 export async function getProductReviews(productId: string): Promise<{ data: LegacyReview[] | null; error: Error | null }> {
   try {
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { data: null, error: new Error('Database not configured') }
+    }
+    
     const { data: reviews, error } = await (supabase as any)
       .from('reviews')
       .select('*')
@@ -321,6 +384,11 @@ export async function addProductReview(
     // Validate product ID
     if (!productId) {
       throw new Error('Product ID is required')
+    }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      throw new Error('Database not configured')
     }
     
     // First check if user can review this product
@@ -381,6 +449,11 @@ export async function getUserReviewCount(userId: string, productId: string): Pro
     if (!productId) {
       return { data: null, error: new Error('Product ID is required') }
     }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { data: null, error: new Error('Database not configured') }
+    }
 
     const { data: reviews, error } = await (supabase as any)
       .from('reviews')
@@ -409,6 +482,11 @@ export async function getProductAverageRating(productId: string): Promise<{
   error: Error | null 
 }> {
   try {
+    // Check if Supabase is configured
+    if (!supabase) {
+      return { data: null, error: new Error('Database not configured') }
+    }
+    
     const { data: reviews, error } = await (supabase as any)
       .from('reviews')
       .select('rating')
@@ -450,6 +528,11 @@ export async function deleteReview(userId: string, reviewId: string): Promise<{ 
     // Validate review ID
     if (!reviewId) {
       throw new Error('Review ID is required')
+    }
+    
+    // Check if Supabase is configured
+    if (!supabase) {
+      throw new Error('Database not configured')
     }
     
     // First check if user can delete this review
