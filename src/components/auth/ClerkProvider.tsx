@@ -3,16 +3,20 @@
 import { ClerkProvider as ClerkReactProvider } from '@clerk/nextjs'
 import { useTheme } from 'next-themes'
 import { dark } from '@clerk/themes'
+import { useEffect, useState } from 'react'
 
 export function ClerkProvider({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme()
+  const [isClient, setIsClient] = useState(false)
+  const [clerkError, setClerkError] = useState(false)
+  
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
   
   // Check if we have the required environment variables
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
   const clerkDomain = process.env.NEXT_PUBLIC_CLERK_DOMAIN
-  
-  // Get the app URL for domain-specific configuration
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ladestudio.shop'
   
   // If we don't have the publishable key, render children without Clerk
   if (!publishableKey) {
@@ -20,16 +24,22 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
   
-  // Determine if this is a satellite application
-  // A satellite app is one that's not running on the primary domain
-  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-  const isSatellite = !!process.env.NEXT_PUBLIC_CLERK_DOMAIN && !isLocalhost
+  // Don't render Clerk on server-side to prevent hydration mismatches
+  if (!isClient) {
+    return <>{children}</>
+  }
   
-  return (
-    <ClerkReactProvider
-      publishableKey={publishableKey}
-      domain={clerkDomain || undefined}
-      appearance={{
+  // If there was an error initializing Clerk, render children without Clerk
+  if (clerkError) {
+    console.warn('Clerk failed to initialize - rendering without Clerk')
+    return <>{children}</>
+  }
+  
+  // Try to render Clerk, but catch any errors
+  try {
+    const clerkProps: any = {
+      publishableKey,
+      appearance: {
         baseTheme: theme === 'dark' ? dark : undefined,
         variables: {
           colorPrimary: '#3b82f6', // Your primary color
@@ -40,8 +50,8 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
           socialButtonsBlockButtonText: 'font-medium',
           formFieldInput: 'border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500',
         },
-      }}
-      localization={{
+      },
+      localization: {
         socialButtonsBlockButton: 'Continue with {{provider|titleize}}',
         signUp: {
           start: {
@@ -55,11 +65,25 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
             subtitle: 'to continue to Lade Studio',
           },
         },
-      }}
-      // Add domain-specific configuration
-      isSatellite={isSatellite}
-    >
-      {children}
-    </ClerkReactProvider>
-  )
+      }
+    }
+    
+    // Add domain configuration if available
+    if (clerkDomain) {
+      clerkProps.domain = clerkDomain
+      // Determine if this is a satellite application
+      const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      clerkProps.isSatellite = !!clerkDomain && !isLocalhost
+    }
+    
+    return (
+      <ClerkReactProvider {...clerkProps}>
+        {children}
+      </ClerkReactProvider>
+    )
+  } catch (error) {
+    console.error('ClerkProvider error:', error)
+    setClerkError(true)
+    return <>{children}</>
+  }
 }

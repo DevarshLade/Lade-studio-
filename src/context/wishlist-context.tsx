@@ -13,20 +13,48 @@ interface WishlistContextType {
   isInWishlist: (productId: string) => boolean;
   loading: boolean;
   refreshWishlist: () => Promise<void>;
+  isSignedIn: boolean | null; // null when checking auth state
+  userId: string | null;
 }
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
+
+// Separate component to handle Clerk hooks - only rendered on client
+function ClientAuthHandler({ 
+  setAuthData
+}: { 
+  setAuthData: (auth: { isSignedIn: boolean; userId: string | null }) => void;
+}) {
+  const { isSignedIn, user } = useUser();
+  
+  useEffect(() => {
+    setAuthData({
+      isSignedIn: isSignedIn || false,
+      userId: user?.id || null
+    });
+  }, [isSignedIn, user]);
+  
+  return null;
+}
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const [wishlistItems, setWishlistItems] = useState<Product[]>([]);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { isSignedIn, user } = useUser();
+  const [isClient, setIsClient] = useState(false);
+  const [authData, setAuthData] = useState<{ isSignedIn: boolean; userId: string | null }>({
+    isSignedIn: false,
+    userId: null
+  });
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Fetch wishlist items and count
   const fetchWishlist = useCallback(async () => {
-    if (!isSignedIn || !user) {
+    if (!authData.isSignedIn || !authData.userId) {
       setWishlistItems([]);
       setWishlistCount(0);
       setLoading(false);
@@ -37,7 +65,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       
       // Fetch wishlist items
-      const { data: wishlistData, error: wishlistError } = await getUserWishlist(user.id);
+      const { data: wishlistData, error: wishlistError } = await getUserWishlist(authData.userId);
       if (wishlistError) {
         console.error("Error fetching wishlist:", wishlistError);
         toast({
@@ -53,7 +81,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       setWishlistItems(products);
 
       // Fetch wishlist count
-      const { count, error: countError } = await getWishlistCount(user.id);
+      const { count, error: countError } = await getWishlistCount(authData.userId);
       if (!countError) {
         setWishlistCount(count || 0);
       }
@@ -67,13 +95,13 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [isSignedIn, user?.id, toast]);
+  }, [authData.isSignedIn, authData.userId, toast]);
 
   // Refresh wishlist on auth state change with debounce
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
-    if (isSignedIn && user) {
+    if (authData.isSignedIn && authData.userId) {
       // Debounce the fetch to prevent multiple rapid calls
       timeoutId = setTimeout(() => {
         fetchWishlist();
@@ -87,10 +115,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [fetchWishlist, isSignedIn, user?.id]);
+  }, [fetchWishlist, authData.isSignedIn, authData.userId]);
 
   const toggleWishlist = useCallback(async (productId: string, productName?: string) => {
-    if (!isSignedIn || !user) {
+    if (!authData.isSignedIn || !authData.userId) {
       toast({
         title: "Authentication Required",
         description: "Please sign in to add items to your wishlist.",
@@ -100,7 +128,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { isInWishlist: newWishlistStatus, error } = await toggleWishlistItem(user.id, productId);
+      const { isInWishlist: newWishlistStatus, error } = await toggleWishlistItem(authData.userId, productId);
       
       if (error) {
         throw new Error(error.message);
@@ -123,7 +151,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
         variant: "destructive"
       });
     }
-  }, [isSignedIn, user?.id, fetchWishlist, toast]);
+  }, [authData.isSignedIn, authData.userId, fetchWishlist, toast]);
 
   const isInWishlist = useCallback((productId: string) => {
     return wishlistItems.some(item => item.id === productId);
@@ -140,11 +168,18 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     toggleWishlist,
     isInWishlist,
     loading,
-    refreshWishlist
-  }), [wishlistItems, wishlistCount, toggleWishlist, isInWishlist, loading, refreshWishlist]);
+    refreshWishlist,
+    isSignedIn: authData.isSignedIn,
+    userId: authData.userId
+  }), [wishlistItems, wishlistCount, toggleWishlist, isInWishlist, loading, refreshWishlist, authData]);
 
   return (
     <WishlistContext.Provider value={contextValue}>
+      {isClient && (
+        <ClientAuthHandler 
+          setAuthData={setAuthData}
+        />
+      )}
       {children}
     </WishlistContext.Provider>
   );

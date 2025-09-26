@@ -4,6 +4,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
 
 interface Props {
   children: ReactNode
@@ -47,33 +48,38 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <div className="mx-auto w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
+              <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
               </div>
-              <CardTitle>Something went wrong</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-center">Something went wrong</CardTitle>
+              <CardDescription className="text-center">
                 We're sorry, but something went wrong. Please try refreshing the page.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <details className="text-sm text-muted-foreground">
-                <summary className="cursor-pointer">Error details</summary>
+                <summary className="cursor-pointer font-medium">Error details</summary>
                 <pre className="mt-2 p-2 bg-muted rounded overflow-auto max-h-32">
                   {this.state.error?.toString()}
                 </pre>
               </details>
-              <Button 
-                onClick={() => {
-                  this.setState({ hasError: false })
-                  window.location.reload()
-                }}
-                className="w-full"
-              >
-                Reload Page
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  onClick={() => {
+                    this.setState({ hasError: false })
+                    window.location.reload()
+                  }}
+                  className="w-full"
+                >
+                  Reload Page
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/fallback">Diagnostics Page</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -36,6 +36,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Check if we have the required environment variables for Clerk
+  const hasClerkConfig = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  
   return (
     <html lang="en">
       <head>
@@ -46,20 +49,31 @@ export default function RootLayout({
         <link rel="preload" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Playfair+Display:wght@400;700&display=swap" as="style" />
       </head>
       <body className="font-body antialiased bg-background text-foreground">
-        <ClerkProvider>
-          <AuthProvider>
-            <ErrorBoundary>
-              <ClientProviders>
-                <div className="flex flex-col min-h-screen">
-                  <Header />
-                  <main className="flex-grow">{children}</main>
-                  <Footer />
-                </div>
-                <Toaster />
-              </ClientProviders>
-            </ErrorBoundary>
-          </AuthProvider>
-        </ClerkProvider>
+        {/* Fallback layout that works even if providers fail */}
+        <ErrorBoundary>
+          {hasClerkConfig ? (
+            <ClerkProvider>
+              <AuthProvider>
+                <ClientProviders>
+                  <div className="flex flex-col min-h-screen">
+                    <Header />
+                    <main className="flex-grow">{children}</main>
+                    <Footer />
+                  </div>
+                  <Toaster />
+                </ClientProviders>
+              </AuthProvider>
+            </ClerkProvider>
+          ) : (
+            // Minimal layout without Clerk for cases where it's not configured
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">{children}</main>
+              <Footer />
+              <Toaster />
+            </div>
+          )}
+        </ErrorBoundary>
       </body>
     </html>
   )

@@ -23,26 +23,65 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Check if Clerk is available
-  const hasClerk = typeof window !== 'undefined' && 
-    typeof useUser === 'function' && 
-    typeof useAuth === 'function'
+// Separate component to handle Clerk hooks - only rendered on client
+function ClientAuthHandler({ 
+  setUserData,
+  setAuthData,
+  setSignInData,
+  setSignUpData,
+  setIsLoaded
+}: { 
+  setUserData: (user: any) => void,
+  setAuthData: (auth: any) => void,
+  setSignInData: (signIn: any) => void,
+  setSignUpData: (signUp: any) => void,
+  setIsLoaded: (loaded: boolean) => void
+}) {
+  // These hooks will only be called on the client side
+  const { user, isLoaded } = useUser()
+  const auth = useAuth()
+  const signIn = useSignIn()
+  const signUp = useSignUp()
   
-  const { user: clerkUser, isLoaded } = hasClerk ? useUser() : { user: null, isLoaded: true }
-  const { sessionId } = hasClerk ? useAuth() : { sessionId: null }
-  const { signIn: clerkSignIn } = hasClerk ? useSignIn() : { signIn: null }
-  const { signUp: clerkSignUp } = hasClerk ? useSignUp() : { signUp: null }
+  useEffect(() => {
+    setUserData(user)
+    setAuthData(auth)
+    setSignInData(signIn)
+    setSignUpData(signUp)
+    setIsLoaded(isLoaded)
+  }, [user, auth, signIn, signUp, isLoaded])
+  
+  return null
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   
+  // State for Clerk data
+  const [clerkUser, setClerkUser] = useState<any>(null)
+  const [clerkAuth, setClerkAuth] = useState<any>(null)
+  const [clerkSignIn, setClerkSignIn] = useState<any>(null)
+  const [clerkSignUp, setClerkSignUp] = useState<any>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
+  
+  // State to track if we're on the client side
+  const [isClient, setIsClient] = useState(false)
+  
+  // Auth state
   const [supabaseUser, setSupabaseUser] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    // This effect only runs on the client side
+    setIsClient(true)
+  }, [])
+
   // Fetch Supabase user data when Clerk user is loaded
   useEffect(() => {
     const fetchSupabaseUser = async () => {
-      if (isLoaded && clerkUser) {
+      // Only fetch on client side when Clerk is loaded
+      if (isLoaded && clerkUser && isClient) {
         // If Supabase is not configured, skip fetching Supabase user data
         if (!isSupabaseConfigured()) {
           setSupabaseUser(null)
@@ -63,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
           setLoading(false)
         }
-      } else if (isLoaded) {
+      } else if (isLoaded && isClient) {
         // No Clerk user, so no Supabase user
         setSupabaseUser(null)
         setLoading(false)
@@ -71,14 +110,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     fetchSupabaseUser()
-  }, [clerkUser, isLoaded])
+  }, [clerkUser, isLoaded, isClient])
 
   const clearError = () => {
     setError(null)
   }
 
   const refreshSupabaseUser = async () => {
-    if (clerkUser && isSupabaseConfigured()) {
+    if (clerkUser && isSupabaseConfigured() && isClient) {
       try {
         const result = await getCurrentUserSupabaseData(clerkUser.id)
         if (result.success) {
@@ -91,8 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    // If Clerk is not available, return an error
-    if (!hasClerk || !clerkSignIn) {
+    // If not on client side or Clerk is not available, return an error
+    if (!isClient || !clerkSignIn) {
       return { user: null, error: new Error('Authentication not available') }
     }
 
@@ -122,8 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, name?: string) => {
-    // If Clerk is not available, return an error
-    if (!hasClerk || !clerkSignUp) {
+    // If not on client side or Clerk is not available, return an error
+    if (!isClient || !clerkSignUp) {
       return { user: null, error: new Error('Authentication not available') }
     }
 
@@ -155,8 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    // If Clerk is not available, return
-    if (!hasClerk) {
+    // If not on client side, return
+    if (!isClient) {
       return
     }
 
@@ -174,8 +213,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    // If Clerk is not available, return an error
-    if (!hasClerk) {
+    // If not on client side, return an error
+    if (!isClient) {
       return { error: new Error('Authentication not available') }
     }
 
@@ -192,8 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updatePassword = async (password: string) => {
-    // If Clerk is not available, return an error
-    if (!hasClerk) {
+    // If not on client side, return an error
+    if (!isClient) {
       return { error: new Error('Authentication not available') }
     }
 
@@ -209,24 +248,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Determine if we should use Clerk data (only on client after initialization)
+  const shouldUseClerkData = isClient && isLoaded;
+  
+  const user = shouldUseClerkData ? clerkUser : null;
+  const session = shouldUseClerkData ? clerkAuth?.sessionId : null;
+  const isAuthenticated = shouldUseClerkData ? !!clerkUser : false;
+  const isLoading = !isClient || !isLoaded || loading;
+
   return (
     <AuthContext.Provider
       value={{
-        user: clerkUser || null,
+        user,
         supabaseUser: supabaseUser || null,
-        session: sessionId || null,
-        loading,
+        session,
+        loading: isLoading,
         error,
         signIn,
         signUp,
         signOut,
         resetPassword,
         updatePassword,
-        isAuthenticated: !!clerkUser,
+        isAuthenticated,
         clearError,
         refreshSupabaseUser,
       }}
     >
+      {/* Only render the ClientAuthHandler on the client side after mounting */}
+      {isClient && (
+        <ClientAuthHandler 
+          setUserData={setClerkUser}
+          setAuthData={setClerkAuth}
+          setSignInData={setClerkSignIn}
+          setSignUpData={setClerkSignUp}
+          setIsLoaded={setIsLoaded}
+        />
+      )}
       {children}
     </AuthContext.Provider>
   )
