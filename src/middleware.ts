@@ -23,6 +23,9 @@ export default clerkMiddleware((auth, req) => {
   if (!isPublicRoute(req)) {
     auth.protect()
   }
+}, { 
+  // Add debug option to help with troubleshooting
+  debug: process.env.NODE_ENV === 'development'
 })
 
 // Always export the config, Next.js will handle missing environment variables

@@ -20,10 +20,15 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
   
+  // Determine if this is a satellite application
+  // A satellite app is one that's not running on the primary domain
+  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  const isSatellite = !!process.env.NEXT_PUBLIC_CLERK_DOMAIN && !isLocalhost
+  
   return (
     <ClerkReactProvider
       publishableKey={publishableKey}
-      domain={clerkDomain || 'clerk.ladestudio.shop'}
+      domain={clerkDomain || undefined}
       appearance={{
         baseTheme: theme === 'dark' ? dark : undefined,
         variables: {
@@ -52,7 +57,7 @@ export function ClerkProvider({ children }: { children: React.ReactNode }) {
         },
       }}
       // Add domain-specific configuration
-      isSatellite={!!process.env.NEXT_PUBLIC_APP_URL && !process.env.NEXT_PUBLIC_APP_URL.includes('localhost')}
+      isSatellite={isSatellite}
     >
       {children}
     </ClerkReactProvider>
